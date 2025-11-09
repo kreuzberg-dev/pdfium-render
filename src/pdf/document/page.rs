@@ -1058,6 +1058,18 @@ impl<'a> Drop for PdfPage<'a> {
     }
 }
 
+// SAFETY: PdfPage contains raw pointers to pdfium handles, but the underlying pdfium
+// library is thread-safe when compiled with the thread_safe feature (which wraps all
+// pdfium calls in a mutex). We're only using PdfPage for reading operations (text extraction),
+// never writing, which is safe across threads. The lifetime 'a ensures the bindings
+// outlive the page, and the document handle is valid for the page's lifetime.
+unsafe impl<'a> Send for PdfPage<'a> {}
+
+// SAFETY: PdfPage is Sync because all pdfium operations are protected by the ThreadSafePdfiumBindings
+// mutex when the thread_safe feature is enabled. Multiple threads can safely hold immutable
+// references to a PdfPage as long as they only perform read operations.
+unsafe impl<'a> Sync for PdfPage<'a> {}
+
 #[cfg(test)]
 mod tests {
     use crate::prelude::*;
