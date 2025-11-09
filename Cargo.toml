@@ -2,7 +2,7 @@
 name = "pdfium-render"
 version = "0.9.0"
 edition = "2024"
-rust-version = "1.90"
+rust-version = "1.85"
 publish = true
 description = "A high-level idiomatic Rust wrapper around Pdfium, the C++ PDF library used by the Google Chromium project."
 readme = "README.md"

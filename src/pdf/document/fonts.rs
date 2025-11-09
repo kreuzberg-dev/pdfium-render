@@ -576,3 +576,8 @@ impl<'a> PdfFonts<'a> {
         self.fonts.get(&token)
     }
 }
+
+// SAFETY: PdfFonts contains a HashMap of PdfFont, which are all Send+Sync.
+// All pdfium operations are protected by ThreadSafePdfiumBindings mutex.
+unsafe impl<'a> Send for PdfFonts<'a> {}
+unsafe impl<'a> Sync for PdfFonts<'a> {}

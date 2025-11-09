@@ -1235,3 +1235,8 @@ impl<'a> Drop for PdfFont<'a> {
         }
     }
 }
+
+// SAFETY: PdfFont contains raw pointers but all pdfium operations are protected by
+// ThreadSafePdfiumBindings mutex when thread_safe feature is enabled.
+unsafe impl<'a> Send for PdfFont<'a> {}
+unsafe impl<'a> Sync for PdfFont<'a> {}

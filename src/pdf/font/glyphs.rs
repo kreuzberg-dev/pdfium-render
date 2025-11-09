@@ -176,3 +176,8 @@ impl<'a> Iterator for PdfFontGlyphsIterator<'a> {
         next.ok()
     }
 }
+
+// SAFETY: PdfFontGlyphs contains raw pointers but all pdfium operations are protected by
+// ThreadSafePdfiumBindings mutex when thread_safe feature is enabled.
+unsafe impl<'a> Send for PdfFontGlyphs<'a> {}
+unsafe impl<'a> Sync for PdfFontGlyphs<'a> {}
