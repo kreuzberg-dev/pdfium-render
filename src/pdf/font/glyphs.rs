@@ -5,7 +5,7 @@ use crate::bindgen::FPDF_FONT;
 use crate::bindings::PdfiumLibraryBindings;
 use crate::error::PdfiumError;
 use crate::pdf::font::glyph::PdfFontGlyph;
-use std::cell::Cell;
+use std::sync::OnceLock;
 use std::ops::{Range, RangeInclusive};
 use std::os::raw::c_uint;
 
@@ -18,7 +18,7 @@ pub type PdfFontGlyphIndex = u16;
 /// A collection of all the [PdfFontGlyph] objects in a [PdfFont].
 pub struct PdfFontGlyphs<'a> {
     handle: FPDF_FONT,
-    len: Cell<Option<PdfFontGlyphIndex>>,
+    len: OnceLock<PdfFontGlyphIndex>,
     bindings: &'a dyn PdfiumLibraryBindings,
 }
 
@@ -27,7 +27,7 @@ impl<'a> PdfFontGlyphs<'a> {
     pub(crate) fn from_pdfium(handle: FPDF_FONT, bindings: &'a dyn PdfiumLibraryBindings) -> Self {
         Self {
             handle,
-            len: Cell::new(None),
+            len: OnceLock::new(),
             bindings,
         }
     }
@@ -39,17 +39,13 @@ impl<'a> PdfFontGlyphs<'a> {
     /// [PdfFontGlyphs] collection by calling the [PdfFont::glyphs] function.
     #[inline]
     pub(crate) fn initialize_len(&self) {
-        if self.len.get().is_none() {
-            // Pdfium does not provide a function that returns the number of glyphs in a font.
-            // We use a binary search algorithm to determine the number of glyphs as efficiently
-            // as possible.
-
-            let len = self
-                .find_maximum_valid_glyph_index(u16::MIN, u16::MAX)
-                .unwrap_or(0);
-
-            self.len.replace(Some(len));
-        }
+        // Pdfium does not provide a function that returns the number of glyphs in a font.
+        // We use a binary search algorithm to determine the number of glyphs as efficiently
+        // as possible. OnceLock ensures this only runs once, even if called from multiple threads.
+        self.len.get_or_init(|| {
+            self.find_maximum_valid_glyph_index(u16::MIN, u16::MAX)
+                .unwrap_or(0)
+        });
     }
 
     /// Returns the highest index position of an extant glyph within the given index range.
@@ -108,7 +104,7 @@ impl<'a> PdfFontGlyphs<'a> {
     /// Returns the number of glyphs in this [PdfFontGlyphs] collection.
     #[inline]
     pub fn len(&self) -> PdfFontGlyphIndex {
-        self.len.get().unwrap_or(0)
+        self.len.get().copied().unwrap_or(0)
     }
 
     /// Returns `true` if this [PdfFontGlyphs] collection is empty.
@@ -178,6 +174,7 @@ impl<'a> Iterator for PdfFontGlyphsIterator<'a> {
 }
 
 // SAFETY: PdfFontGlyphs contains raw pointers but all pdfium operations are protected by
-// ThreadSafePdfiumBindings mutex when thread_safe feature is enabled.
+// ThreadSafePdfiumBindings mutex when thread_safe feature is enabled. OnceLock provides
+// thread-safe lazy initialization for the length field.
 unsafe impl<'a> Send for PdfFontGlyphs<'a> {}
 unsafe impl<'a> Sync for PdfFontGlyphs<'a> {}
